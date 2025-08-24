@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::TAU;
 
 use cpal::{
     SampleFormat, StreamConfig,
@@ -24,7 +24,7 @@ fn main() {
     // 音のパラメータ
     let sample_rate = config.sample_rate.0 as f32;
     let channels = config.channels as usize;
-    let phase_size = 2.0 * PI;
+    let phase_size = TAU; // 位相の周期 (2π)
     let freq_h = 440.0_f32;
     let phase_inc = phase_size * freq_h / sample_rate; // A4 = 440Hz
 
@@ -52,32 +52,51 @@ fn build_stream<T>(
     err_fn: impl Fn(cpal::StreamError) + Send + 'static,
 ) -> Result<cpal::Stream, cpal::BuildStreamError>
 where
-    T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32>,
+    T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32> + Send + 'static,
 {
     let mut phase = 0.0_f32; // 位相の時間軸: [0.0, phase_size)
+    let mut block: Vec<f32> = Vec::new();
     device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
             let volume = 0.2; // 0.0 ~ 1.0
-            for frame in data.chunks_mut(channels) {
-                let wave = phase.sin(); // 波の形
-                let value: f32 = wave * volume; // 音量を考慮した波形
+
+            // ブロック合成
+            let frames = data.len() / channels;
+            block.resize(frames, 0.0);
+
+            for sample in block.iter_mut() {
+                *sample = phase.sin() * volume; // 波の形
                 phase += phase_inc; // 位相を更新
-                // 位相が phase_size を超えたら0に戻す
-                if phase > phase_size {
-                    phase = 0.0;
+                if phase >= phase_size {
+                    phase -= phase_size; // 位相を位相サイズ内に収める
                 }
+            }
 
-                let s: T = cpal::Sample::from_sample(value);
-
-                if channels == 2 {
+            match channels {
+                1 => {
+                    // モノラル
+                    for (frame, &sample) in data.chunks_mut(channels).zip(block.iter()) {
+                        let s: T = cpal::Sample::from_sample(sample);
+                        frame[0] = s;
+                    }
+                }
+                2 => {
                     // ステレオ
-                    frame[0] = s; // 左
-                    frame[1] = s; // 右
-                    continue;
-                } else {
-                    // ステレオ以外ならモノラルとして扱う
-                    frame[0] = s; // モノラル
+                    for (frame, &sample) in data.chunks_mut(channels).zip(block.iter()) {
+                        let s: T = cpal::Sample::from_sample(sample);
+                        frame[0] = s; // 左
+                        frame[1] = s; // 右
+                    }
+                }
+                _ => {
+                    // その他のチャンネル数はモノラルとして扱う
+                    for (frames, &sample) in data.chunks_mut(channels).zip(block.iter()) {
+                        let s: T = cpal::Sample::from_sample(sample);
+                        for frame in frames {
+                            *frame = s;
+                        }
+                    }
                 }
             }
         },
