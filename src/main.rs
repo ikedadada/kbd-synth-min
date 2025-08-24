@@ -31,6 +31,7 @@ fn main() {
             Waveform::Sine
         }
     };
+    let master_volume = 0.2_f32;
 
     // デバイスと出力設定
     let host = cpal::default_host();
@@ -70,8 +71,17 @@ fn main() {
     // ストリーム作成
     let err_fn = |err: cpal::StreamError| eprintln!("an error occurred on stream: {}", err);
     let stream = match sample_format {
-        SampleFormat::F32 => build_stream::<f32>(&device, &config, channels, osc, adsr, rx, err_fn)
-            .expect("Failed to build stream"),
+        SampleFormat::F32 => build_stream::<f32>(BuildStreamParams {
+            device: &device,
+            config: &config,
+            channels,
+            master_volume,
+            osc,
+            adsr,
+            rx,
+            err_fn: Box::new(err_fn),
+        })
+        .expect("Failed to build stream"),
         _ => unimplemented!("Only f32 sample format is implemented"),
     };
 
@@ -80,40 +90,47 @@ fn main() {
     stream.pause().expect("Failed to pause stream");
 }
 
-fn build_stream<T>(
-    device: &cpal::Device,
-    config: &StreamConfig,
+struct BuildStreamParams<'a> {
+    device: &'a cpal::Device,
+    config: &'a StreamConfig,
     channels: usize,
+    master_volume: f32,
     osc: Osc,
     adsr: Adsr,
     rx: Receiver<Control>,
-    err_fn: impl Fn(cpal::StreamError) + Send + 'static,
-) -> Result<cpal::Stream, cpal::BuildStreamError>
+    err_fn: Box<dyn Fn(cpal::StreamError) + Send + 'static>,
+}
+
+fn build_stream<T>(params: BuildStreamParams) -> Result<cpal::Stream, cpal::BuildStreamError>
 where
     T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32> + Send + 'static,
 {
-    let mut osc = osc;
-    let mut adsr = adsr;
+    let mut osc = params.osc;
+    let mut adsr = params.adsr;
 
-    device.build_output_stream(
-        config,
+    params.device.build_output_stream(
+        params.config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-            while let Ok(control) = rx.try_recv() {
+            while let Ok(control) = params.rx.try_recv() {
                 match control {
                     Control::NoteOn => adsr.note_on(),
                     Control::NoteOff => adsr.note_off(),
                 }
             }
 
-            for frames in data.chunks_mut(channels) {
-                let sample = osc.next_sample() * adsr.next_sample();
+            for frames in data.chunks_mut(params.channels) {
+                let sample = if params.master_volume == 0.0 {
+                    0.0
+                } else {
+                    osc.next_sample() * adsr.next_sample() * params.master_volume + 1e-20f32
+                };
                 let s: T = cpal::Sample::from_sample(sample);
                 for frame in frames {
                     *frame = s;
                 }
             }
         },
-        err_fn,
+        params.err_fn,
         None,
     )
 }

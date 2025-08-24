@@ -11,7 +11,7 @@ pub struct Osc {
 impl Osc {
     pub fn new(freq_hz: f32, sr: f32, waveform: Waveform) -> Self {
         let phase = 0.0;
-        let amp = 0.2;
+        let amp = 1.0;
         let phase_inc = (freq_hz / sr) * TAU; // 1周期を2πとする
         Self {
             phase,
