@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Osc {
     phase: f32,
     amp: f32,
@@ -21,6 +21,10 @@ impl Osc {
         }
     }
 
+    pub fn set_freq(&mut self, freq_hz: f32) {
+        self.phase_inc = (freq_hz / 44100.0) * TAU; // サンプルレート固定
+    }
+
     pub fn next_sample(&mut self) -> f32 {
         let sample = self.waveform.sample(self.phase) * self.amp;
         self.phase += self.phase_inc;
@@ -31,8 +35,9 @@ impl Osc {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Waveform {
+    #[default]
     Sine,
     Square,
     Sawtooth,

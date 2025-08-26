@@ -1,5 +1,6 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum EnvState {
+    #[default]
     Idle,
     Attack,
     Decay,
@@ -7,7 +8,7 @@ pub enum EnvState {
     Release,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Adsr {
     a: f32, // Attack time
     d: f32, // Decay time
