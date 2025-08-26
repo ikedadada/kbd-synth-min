@@ -14,8 +14,7 @@ use crossterm::{
 };
 
 use crate::libs::{
-    adsr::Adsr,
-    osc::{Osc, Waveform},
+    osc::Waveform,
     shared_bus::{Msg, SharedBus},
     synth::Synth,
 };
@@ -112,7 +111,6 @@ fn wait_for_event(bus: SharedBus) -> Result<(), std::io::Error> {
                 KeyCode::Char(',') => 523.251,
                 _ => continue,
             };
-            println!("Key event: {:?}", key_event);
             let _ = match key_event.kind {
                 event::KeyEventKind::Press => bus.q.push(Msg::NoteOn { note }),
                 event::KeyEventKind::Release => bus.q.push(Msg::NoteOff { note }),

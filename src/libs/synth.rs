@@ -33,8 +33,8 @@ impl Synth {
             master_volume: 0.2,
             attack: 0.0,
             decay: 0.5,
-            sustain: 0.0,
-            release: 0.0,
+            sustain: 1.0,
+            release: 0.5,
             waveform: Waveform::Sine,
         }
     }
@@ -52,13 +52,11 @@ impl Synth {
     }
 
     pub fn note_off(&mut self, note: f32) {
-        println!("Note off: {}", note);
         if let Some(voice) = self
             .voices
             .iter_mut()
             .find(|v| v.on && (v.note - note).abs() < f32::EPSILON)
         {
-            voice.on = false;
             voice.asdr.note_off();
         }
     }
