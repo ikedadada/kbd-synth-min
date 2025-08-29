@@ -26,7 +26,7 @@ pub struct Synth {
 }
 
 impl Synth {
-    pub fn new(sr: f32) -> Self {
+    pub fn new(sr: f32, waveform: Waveform) -> Self {
         Self {
             sr,
             voices: [Default::default(); MAX_VOICES],
@@ -35,7 +35,7 @@ impl Synth {
             decay: 0.5,
             sustain: 1.0,
             release: 0.5,
-            waveform: Waveform::Sine,
+            waveform,
         }
     }
 

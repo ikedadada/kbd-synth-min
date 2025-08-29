@@ -20,11 +20,3 @@ impl SharedBus {
         Self { q }
     }
 }
-
-pub fn handle_key_down(bus: &SharedBus, note: f32) {
-    let _ = bus.q.push(Msg::NoteOn { note });
-}
-
-pub fn handle_key_up(bus: &SharedBus, note: f32) {
-    let _ = bus.q.push(Msg::NoteOff { note });
-}

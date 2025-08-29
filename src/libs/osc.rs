@@ -21,10 +21,6 @@ impl Osc {
         }
     }
 
-    pub fn set_freq(&mut self, freq_hz: f32) {
-        self.phase_inc = (freq_hz / 44100.0) * TAU; // サンプルレート固定
-    }
-
     pub fn next_sample(&mut self) -> f32 {
         let sample = self.waveform.sample(self.phase) * self.amp;
         self.phase += self.phase_inc;

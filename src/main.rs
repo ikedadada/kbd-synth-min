@@ -34,7 +34,6 @@ fn main() {
             Waveform::Sine
         }
     };
-    let master_volume = 0.2_f32;
 
     // デバイスと出力設定
     let host = cpal::default_host();
@@ -67,6 +66,7 @@ fn main() {
             bus: bus.clone(),
             channels,
             sample_rate,
+            waveform,
             err_fn: Box::new(err_fn),
         })
         .expect("Failed to build stream"),
@@ -130,6 +130,7 @@ struct BuildStreamParams<'a> {
     bus: SharedBus,
     channels: usize,
     sample_rate: f32,
+    waveform: Waveform,
     err_fn: Box<dyn Fn(cpal::StreamError) + Send + 'static>,
 }
 
@@ -137,7 +138,7 @@ fn build_stream<T>(params: BuildStreamParams) -> Result<cpal::Stream, cpal::Buil
 where
     T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32> + Send + 'static,
 {
-    let mut synth = Synth::new(params.sample_rate);
+    let mut synth = Synth::new(params.sample_rate, params.waveform);
     let bus = params.bus;
 
     params.device.build_output_stream(
