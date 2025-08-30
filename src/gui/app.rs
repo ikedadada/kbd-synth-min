@@ -19,10 +19,10 @@ pub enum FilterTypeUi {
 }
 
 impl FilterTypeUi {
-    fn to_filter_type(&self, cut_off: f32) -> FilterType {
+    fn to_filter_type(&self, cut_off: f32, q: f32) -> FilterType {
         match self {
             Self::OnePoleLpf => FilterType::OnePoleLpf(cut_off),
-            Self::TwoPoleLpf => FilterType::TwoPoleLpf(cut_off),
+            Self::TwoPoleLpf => FilterType::TwoPoleLpf(cut_off, q),
         }
     }
 }
@@ -30,6 +30,7 @@ impl FilterTypeUi {
 pub struct FilterUi {
     show: bool,
     cutoff: f32,
+    q: f32,
     filter_type: FilterTypeUi,
 }
 
@@ -46,6 +47,7 @@ impl EguiUi {
             filter: FilterUi {
                 show: false,
                 cutoff: 1000.0,
+                q: 5.0,
                 filter_type: FilterTypeUi::OnePoleLpf,
             },
         };
@@ -108,15 +110,6 @@ impl App for EguiUi {
             changed.3 |= ui.checkbox(&mut self.filter.show, "Enabled").changed();
             if self.filter.show {
                 ui.horizontal(|ui| {
-                    ui.label("Cutoff:");
-                    changed.3 |= ui
-                        .add(
-                            egui::Slider::new(&mut self.filter.cutoff, 20.0..=20000.0)
-                                .text("Cutoff"),
-                        )
-                        .changed();
-                });
-                ui.horizontal(|ui| {
                     ui.label("Type:");
                     changed.3 |= ui
                         .selectable_value(
@@ -133,6 +126,23 @@ impl App for EguiUi {
                         )
                         .changed();
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Cutoff:");
+                    changed.3 |= ui
+                        .add(
+                            egui::Slider::new(&mut self.filter.cutoff, 20.0..=20000.0)
+                                .text("Cutoff"),
+                        )
+                        .changed();
+                });
+                if self.filter.filter_type == FilterTypeUi::TwoPoleLpf {
+                    ui.horizontal(|ui| {
+                        ui.label("Resonance (Q):");
+                        changed.3 |= ui
+                            .add(egui::Slider::new(&mut self.filter.q, 0.1..=10.0).text("Q"))
+                            .changed();
+                    });
+                }
             };
 
             if changed.0 {
@@ -151,7 +161,11 @@ impl App for EguiUi {
             }
             if changed.3 {
                 let filter_msg = if self.filter.show {
-                    Some(self.filter.filter_type.to_filter_type(self.filter.cutoff))
+                    Some(
+                        self.filter
+                            .filter_type
+                            .to_filter_type(self.filter.cutoff, self.filter.q),
+                    )
                 } else {
                     None
                 };
