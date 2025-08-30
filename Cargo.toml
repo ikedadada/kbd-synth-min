@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 cpal = "0.16.0"
 crossbeam = "0.8.4"
-crossterm = "0.29.0"
+eframe = { version = "0.32.1", default-features = false, features = ["glow", "default_fonts", "wayland"] }

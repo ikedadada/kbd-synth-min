@@ -142,4 +142,9 @@ impl Adsr {
         }
         self.level
     }
+
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.level > 0.0
+    }
 }

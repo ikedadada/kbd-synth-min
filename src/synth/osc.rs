@@ -29,9 +29,13 @@ impl Osc {
         }
         sample
     }
+
+    pub fn set_waveform(&mut self, waveform: Waveform) {
+        self.waveform = waveform;
+    }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Waveform {
     #[default]
     Sine,
