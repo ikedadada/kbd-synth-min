@@ -1,4 +1,4 @@
-use crate::synth::{Msg, Note, SharedBus, Waveform};
+use crate::synth::{FilterType, Msg, Note, SharedBus, Waveform};
 use eframe::{App, Frame, egui};
 
 pub struct EguiUi {
@@ -9,6 +9,28 @@ pub struct EguiUi {
     sustain: f32,
     release: f32,
     waveform: Waveform,
+    filter: FilterUi,
+}
+
+#[derive(PartialEq)]
+pub enum FilterTypeUi {
+    OnePoleLpf,
+    TwoPoleLpf,
+}
+
+impl FilterTypeUi {
+    fn to_filter_type(&self, cut_off: f32) -> FilterType {
+        match self {
+            Self::OnePoleLpf => FilterType::OnePoleLpf(cut_off),
+            Self::TwoPoleLpf => FilterType::TwoPoleLpf(cut_off),
+        }
+    }
+}
+
+pub struct FilterUi {
+    show: bool,
+    cutoff: f32,
+    filter_type: FilterTypeUi,
 }
 
 impl EguiUi {
@@ -21,6 +43,11 @@ impl EguiUi {
             sustain: 1.0,
             release: 0.5,
             waveform: Waveform::Sine,
+            filter: FilterUi {
+                show: false,
+                cutoff: 1000.0,
+                filter_type: FilterTypeUi::OnePoleLpf,
+            },
         };
         // Push initial params
         let _ = ui.bus.q.push(Msg::SetMasterVolume(ui.master));
@@ -41,48 +68,94 @@ impl App for EguiUi {
         let events = ctx.input(|i| i.events.clone());
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Synth Controls");
-            let mut changed = false;
-            changed |= ui
+            let mut changed = (false, false, false, false);
+            changed.0 |= ui
                 .add(egui::Slider::new(&mut self.master, 0.0..=1.0).text("Master"))
                 .changed();
-            changed |= ui
+            changed.1 |= ui
                 .add(egui::Slider::new(&mut self.attack, 0.0..=2.0).text("Attack"))
                 .changed();
-            changed |= ui
+            changed.1 |= ui
                 .add(egui::Slider::new(&mut self.decay, 0.0..=2.0).text("Decay"))
                 .changed();
-            changed |= ui
+            changed.1 |= ui
                 .add(egui::Slider::new(&mut self.sustain, 0.0..=1.0).text("Sustain"))
                 .changed();
-            changed |= ui
+            changed.1 |= ui
                 .add(egui::Slider::new(&mut self.release, 0.0..=2.0).text("Release"))
                 .changed();
 
             ui.horizontal(|ui| {
                 ui.label("Waveform:");
-                changed |= ui
+                changed.2 |= ui
                     .selectable_value(&mut self.waveform, Waveform::Sine, "Sine")
                     .changed();
-                changed |= ui
+                changed.2 |= ui
                     .selectable_value(&mut self.waveform, Waveform::Square, "Square")
                     .changed();
-                changed |= ui
+                changed.2 |= ui
                     .selectable_value(&mut self.waveform, Waveform::Sawtooth, "Saw")
                     .changed();
-                changed |= ui
+                changed.2 |= ui
                     .selectable_value(&mut self.waveform, Waveform::Triangle, "Tri")
                     .changed();
             });
 
-            if changed {
+            // フィルタ選択UIの追加
+            // フィルタのOn/Off
+            ui.label("Filter:");
+            // FilterのOn/Off
+            changed.3 |= ui.checkbox(&mut self.filter.show, "Enabled").changed();
+            if self.filter.show {
+                ui.horizontal(|ui| {
+                    ui.label("Cutoff:");
+                    changed.3 |= ui
+                        .add(
+                            egui::Slider::new(&mut self.filter.cutoff, 20.0..=20000.0)
+                                .text("Cutoff"),
+                        )
+                        .changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Type:");
+                    changed.3 |= ui
+                        .selectable_value(
+                            &mut self.filter.filter_type,
+                            FilterTypeUi::OnePoleLpf,
+                            "OnePoleLpf",
+                        )
+                        .changed();
+                    changed.3 |= ui
+                        .selectable_value(
+                            &mut self.filter.filter_type,
+                            FilterTypeUi::TwoPoleLpf,
+                            "TwoPoleLpf",
+                        )
+                        .changed();
+                });
+            };
+
+            if changed.0 {
                 let _ = self.bus.q.push(Msg::SetMasterVolume(self.master));
+            }
+            if changed.1 {
                 let _ = self.bus.q.push(Msg::SetAdsr {
                     a: self.attack,
                     d: self.decay,
                     s: self.sustain,
                     r: self.release,
                 });
+            }
+            if changed.2 {
                 let _ = self.bus.q.push(Msg::SetWaveform(self.waveform));
+            }
+            if changed.3 {
+                let filter_msg = if self.filter.show {
+                    Some(self.filter.filter_type.to_filter_type(self.filter.cutoff))
+                } else {
+                    None
+                };
+                let _ = self.bus.q.push(Msg::SetFilter(filter_msg));
             }
         });
 

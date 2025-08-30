@@ -1,5 +1,6 @@
 use crate::synth::{
     adsr::Adsr,
+    filter::{Filter, FilterTrait, FilterType},
     note::Note,
     osc::{Osc, Waveform},
 };
@@ -11,6 +12,7 @@ struct Voice {
     phase: f32,
     asdr: Adsr,
     osc: Osc,
+    filter: Option<Filter>,
 }
 
 const MAX_VOICES: usize = 16;
@@ -24,19 +26,21 @@ pub struct Synth {
     sustain: f32,
     release: f32,
     waveform: Waveform,
+    filter_type: Option<FilterType>,
 }
 
 impl Synth {
-    pub fn new(sr: f32, waveform: Waveform) -> Self {
+    pub fn new(sr: f32, waveform: Waveform, filter_type: Option<FilterType>) -> Self {
         Self {
             sr,
-            voices: [Default::default(); MAX_VOICES],
+            voices: [Voice::default(); MAX_VOICES],
             master_volume: 0.2,
             attack: 0.0,
             decay: 0.5,
             sustain: 1.0,
             release: 0.5,
             waveform,
+            filter_type,
         }
     }
 
@@ -45,6 +49,7 @@ impl Synth {
         adsr.note_on();
         if let Some(v) = self.voices.iter_mut().find(|v| v.on && v.note == note) {
             v.asdr = adsr;
+            let _ = v.filter.as_mut().map(|f| f.reset());
             return;
         }
         if let Some(voice) = self.voices.iter_mut().find(|v| !v.on) {
@@ -53,6 +58,9 @@ impl Synth {
             voice.phase = 0.0;
             voice.asdr = adsr;
             voice.osc = Osc::new(note.into(), self.sr, self.waveform);
+            voice.filter = self
+                .filter_type
+                .map(|filter_type| Filter::new(filter_type, self.sr));
         }
     }
 
@@ -77,6 +85,11 @@ impl Synth {
                     continue;
                 }
                 let osc_sample = voice.osc.next_sample();
+                let osc_sample = voice
+                    .filter
+                    .as_mut()
+                    .map(|f| f.process(osc_sample))
+                    .unwrap_or(osc_sample);
                 sample += osc_sample * env;
             }
         }
@@ -95,7 +108,7 @@ impl Synth {
         // 進行中のボイスのASDRを更新（次のサンプルから反映）
         for v in self.voices.iter_mut() {
             if v.on {
-                v.asdr = Adsr::new(self.attack, self.decay, self.sustain, self.release, self.sr);
+                v.asdr.retune(a, d, s, r);
                 if v.asdr.is_active() {
                     v.asdr.note_on();
                 }
@@ -103,10 +116,34 @@ impl Synth {
         }
     }
 
-    pub fn set_waveform(&mut self, wf: Waveform) {
-        self.waveform = wf;
+    pub fn set_waveform(&mut self, new: Waveform) {
+        self.waveform = new;
         for v in self.voices.iter_mut() {
-            v.osc.set_waveform(wf);
+            v.osc.set_waveform(new);
+        }
+    }
+
+    pub fn set_filter(&mut self, new: Option<FilterType>) {
+        self.filter_type = new;
+        for v in self.voices.iter_mut() {
+            match (new, v.filter.as_mut()) {
+                (None, _) => {
+                    v.filter = None;
+                }
+                (Some(ft), None) => {
+                    v.filter = Some(Filter::new(ft, self.sr));
+                }
+                (Some(FilterType::OnePoleLpf(c)), Some(Filter::OnePoleLpf(f))) => {
+                    f.set_cutoff(self.sr, c); // 型は同じ → 係数更新だけ
+                }
+                (Some(FilterType::TwoPoleLpf(c)), Some(Filter::TwoPoleLpf(f))) => {
+                    f.set_cutoff(self.sr, c); // 型は同じ → 係数更新だけ
+                }
+                (Some(ft), Some(_old_other_type)) => {
+                    // 型が変わる → 作り直す（必要なら新規に reset 済み）
+                    v.filter = Some(Filter::new(ft, self.sr));
+                }
+            }
         }
     }
 }

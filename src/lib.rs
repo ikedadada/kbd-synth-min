@@ -1,11 +1,13 @@
 pub mod synth {
     mod adsr;
     mod engine;
+    mod filter;
     mod note;
     mod osc;
     mod shared_bus;
     // Re-export primary types to avoid deep paths
     pub use engine::Synth;
+    pub use filter::FilterType;
     pub use note::Note;
     pub use osc::Waveform;
     pub use shared_bus::Msg;

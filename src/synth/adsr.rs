@@ -41,6 +41,13 @@ impl Adsr {
         }
     }
 
+    pub fn retune(&mut self, a: f32, d: f32, s: f32, r: f32) {
+        self.a = a;
+        self.d = d;
+        self.s = s.clamp(0.0, 1.0);
+        self.r = r;
+    }
+
     #[inline]
     fn set_stage(&mut self, time_sec: f32, target: f32) {
         self.target = target;
