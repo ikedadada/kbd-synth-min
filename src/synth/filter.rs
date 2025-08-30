@@ -127,7 +127,7 @@ impl TwoPoleLpf {
         let a1 = -2.0 * cw0;
         let a2 = 1.0 - alpha;
 
-        self.b1 = b0 / a0; // 正規化された係数
+        self.b0 = b0 / a0; // 正規化された係数
         self.b1 = b1 / a0;
         self.b2 = b2 / a0;
         self.a1 = a1 / a0;
