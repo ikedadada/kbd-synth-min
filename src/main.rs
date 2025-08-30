@@ -40,7 +40,7 @@ fn main() {
             channels,
             sample_rate,
             waveform: Waveform::Sine,
-            filter: Some(FilterType::OnePoleLpf(1000.0)),
+            filter: None,
             err_fn: Box::new(|err| eprintln!("an error occurred on stream: {}", err)),
         })
         .expect("Failed to build stream"),

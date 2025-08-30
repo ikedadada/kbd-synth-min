@@ -136,8 +136,8 @@ impl Synth {
                 (Some(FilterType::OnePoleLpf(c)), Some(Filter::OnePoleLpf(f))) => {
                     f.set_cutoff(self.sr, c); // 型は同じ → 係数更新だけ
                 }
-                (Some(FilterType::TwoPoleLpf(c)), Some(Filter::TwoPoleLpf(f))) => {
-                    f.set_cutoff(self.sr, c); // 型は同じ → 係数更新だけ
+                (Some(FilterType::TwoPoleLpf(c, q)), Some(Filter::TwoPoleLpf(f))) => {
+                    f.set_params(self.sr, c, q);
                 }
                 (Some(ft), Some(_old_other_type)) => {
                     // 型が変わる → 作り直す（必要なら新規に reset 済み）
