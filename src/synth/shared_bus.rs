@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crossbeam::queue::ArrayQueue;
 
-use crate::synth::{Note, osc::Waveform};
+use crate::synth::{FilterType, Note, osc::Waveform};
 
 const QUEUE_CAP: usize = 2048;
 
@@ -13,6 +13,7 @@ pub enum Msg {
     SetMasterVolume(f32),
     SetAdsr { a: f32, d: f32, s: f32, r: f32 },
     SetWaveform(Waveform),
+    SetFilter(Option<FilterType>),
 }
 
 #[derive(Clone, Debug)]

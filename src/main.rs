@@ -6,7 +6,7 @@ use cpal::{
 use eframe::{NativeOptions, egui};
 use kbd_synth_min::{
     gui::EguiUi,
-    synth::{Msg, SharedBus, Synth, Waveform},
+    synth::{FilterType, Msg, SharedBus, Synth, Waveform},
 };
 
 fn main() {
@@ -40,6 +40,7 @@ fn main() {
             channels,
             sample_rate,
             waveform: Waveform::Sine,
+            filter: Some(FilterType::OnePoleLpf(1000.0)),
             err_fn: Box::new(|err| eprintln!("an error occurred on stream: {}", err)),
         })
         .expect("Failed to build stream"),
@@ -67,6 +68,7 @@ struct BuildStreamParams<'a> {
     channels: usize,
     sample_rate: f32,
     waveform: Waveform,
+    filter: Option<FilterType>,
     err_fn: Box<dyn Fn(cpal::StreamError) + Send + 'static>,
 }
 
@@ -74,7 +76,7 @@ fn build_stream<T>(params: BuildStreamParams) -> Result<cpal::Stream, cpal::Buil
 where
     T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32> + Send + 'static,
 {
-    let mut synth = Synth::new(params.sample_rate, params.waveform);
+    let mut synth = Synth::new(params.sample_rate, params.waveform, params.filter);
     let bus = params.bus;
 
     params.device.build_output_stream(
@@ -87,6 +89,7 @@ where
                     Msg::SetMasterVolume(v) => synth.set_master_volume(v),
                     Msg::SetAdsr { a, d, s, r } => synth.set_adsr(a, d, s, r),
                     Msg::SetWaveform(wf) => synth.set_waveform(wf),
+                    Msg::SetFilter(ft) => synth.set_filter(ft),
                 }
             }
             for frames in data.chunks_mut(params.channels) {
