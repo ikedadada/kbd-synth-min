@@ -23,7 +23,22 @@ crossbeam = "0.8.4"
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Window", "Document", "HtmlCanvasElement"] }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    # WebAudio
+    "BaseAudioContext",
+    "AudioContext",
+    "AudioNode",
+    "AudioDestinationNode",
+    "AudioBuffer",
+    "ScriptProcessorNode",
+    "AudioProcessingEvent",
+    # Events
+    "EventTarget",
+    "KeyboardEvent",
+] }
 eframe = { version = "0.32.1", default-features = false, features = ["glow", "default_fonts"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
