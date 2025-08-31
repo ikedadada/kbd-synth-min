@@ -33,9 +33,6 @@ jobs:
       - name: Install trunk
         run: cargo install trunk
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
       - name: Build (trunk)
         run: trunk build --release --public-url "/${{ github.event.repository.name }}/"
 
@@ -55,4 +52,3 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
-
