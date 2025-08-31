@@ -8,11 +8,43 @@ pub struct EguiUi {
     decay: f32,
     sustain: f32,
     release: f32,
-    waveform: Waveform,
+    waveform: WaveformUi,
     filter: FilterUi,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
+pub enum WaveformTypeUi {
+    Sine,
+    Square,
+    Saw,
+    Triangle,
+}
+
+impl WaveformTypeUi {
+    fn to_waveform(&self, pulse_width: f32, curve: f32) -> Waveform {
+        match self {
+            WaveformTypeUi::Sine => Waveform::Sine,
+            WaveformTypeUi::Square => Waveform::Square { pulse_width },
+            WaveformTypeUi::Saw => Waveform::Sawtooth,
+            WaveformTypeUi::Triangle => Waveform::Triangle { curve },
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct WaveformUi {
+    pulse_width: f32,
+    curve: f32,
+    waveform_type: WaveformTypeUi,
+}
+
+impl From<WaveformUi> for Waveform {
+    fn from(ui: WaveformUi) -> Self {
+        ui.waveform_type.to_waveform(ui.pulse_width, ui.curve)
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub enum FilterTypeUi {
     OnePoleLpf,
     TwoPoleLpf,
@@ -27,11 +59,18 @@ impl FilterTypeUi {
     }
 }
 
+#[derive(Clone)]
 pub struct FilterUi {
     show: bool,
     cutoff: f32,
     q: f32,
     filter_type: FilterTypeUi,
+}
+
+impl From<FilterUi> for FilterType {
+    fn from(ui: FilterUi) -> Self {
+        ui.filter_type.to_filter_type(ui.cutoff, ui.q)
+    }
 }
 
 impl EguiUi {
@@ -43,7 +82,11 @@ impl EguiUi {
             decay: 0.5,
             sustain: 1.0,
             release: 0.5,
-            waveform: Waveform::Sine,
+            waveform: WaveformUi {
+                pulse_width: 0.5,
+                curve: 0.0,
+                waveform_type: WaveformTypeUi::Sine,
+            },
             filter: FilterUi {
                 show: false,
                 cutoff: 1000.0,
@@ -59,7 +102,7 @@ impl EguiUi {
             s: ui.sustain,
             r: ui.release,
         });
-        let _ = ui.bus.q.push(Msg::SetWaveform(ui.waveform));
+        let _ = ui.bus.q.push(Msg::SetWaveform(ui.waveform.clone().into()));
         ui
     }
 }
@@ -90,18 +133,59 @@ impl App for EguiUi {
             ui.horizontal(|ui| {
                 ui.label("Waveform:");
                 changed.2 |= ui
-                    .selectable_value(&mut self.waveform, Waveform::Sine, "Sine")
+                    .selectable_value(
+                        &mut self.waveform.waveform_type,
+                        WaveformTypeUi::Sine,
+                        "Sine",
+                    )
                     .changed();
                 changed.2 |= ui
-                    .selectable_value(&mut self.waveform, Waveform::Square, "Square")
+                    .selectable_value(
+                        &mut self.waveform.waveform_type,
+                        WaveformTypeUi::Square,
+                        "Square",
+                    )
                     .changed();
                 changed.2 |= ui
-                    .selectable_value(&mut self.waveform, Waveform::Sawtooth, "Saw")
+                    .selectable_value(&mut self.waveform.waveform_type, WaveformTypeUi::Saw, "Saw")
                     .changed();
                 changed.2 |= ui
-                    .selectable_value(&mut self.waveform, Waveform::Triangle, "Tri")
+                    .selectable_value(
+                        &mut self.waveform.waveform_type,
+                        WaveformTypeUi::Triangle,
+                        "Tri",
+                    )
                     .changed();
             });
+
+            // ここを追加: 選択中の波形に応じたパラメータUI
+            match self.waveform.waveform_type {
+                WaveformTypeUi::Square => {
+                    ui.horizontal(|ui| {
+                        ui.label("Pulse width:");
+                        // 0や1は無音/直流に近くなるので少しマージンを取るのが無難
+                        changed.2 |= ui
+                            .add(
+                                egui::Slider::new(&mut self.waveform.pulse_width, 0.05..=0.95)
+                                    .text("PW"),
+                            )
+                            .changed();
+                    });
+                }
+                WaveformTypeUi::Triangle => {
+                    ui.horizontal(|ui| {
+                        ui.label("Curve:");
+                        // 0.0 = リニア、1.0 で尖りが強くなる想定
+                        changed.2 |= ui
+                            .add(
+                                egui::Slider::new(&mut self.waveform.curve, 0.0..=1.0)
+                                    .text("Curve"),
+                            )
+                            .changed();
+                    });
+                }
+                _ => {}
+            }
 
             // フィルタ選択UIの追加
             // フィルタのOn/Off
@@ -157,15 +241,14 @@ impl App for EguiUi {
                 });
             }
             if changed.2 {
-                let _ = self.bus.q.push(Msg::SetWaveform(self.waveform));
+                let _ = self
+                    .bus
+                    .q
+                    .push(Msg::SetWaveform(self.waveform.clone().into()));
             }
             if changed.3 {
                 let filter_msg = if self.filter.show {
-                    Some(
-                        self.filter
-                            .filter_type
-                            .to_filter_type(self.filter.cutoff, self.filter.q),
-                    )
+                    Some(self.filter.clone().into())
                 } else {
                     None
                 };
