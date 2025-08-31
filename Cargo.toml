@@ -3,8 +3,18 @@ name = "kbd_synth_min"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Enable the native (desktop) binary only when this feature is set.
+native = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "kbd_synth_min"
+path = "src/main.rs"
+# Skip building the binary unless the `native` feature is enabled
+required-features = ["native"]
 
 [dependencies]
 crossbeam = "0.8.4"
