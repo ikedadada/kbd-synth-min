@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 use cpal::{
     SampleFormat, StreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},

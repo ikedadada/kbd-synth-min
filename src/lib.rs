@@ -24,8 +24,8 @@ pub mod gui {
 mod web_entry {
     use crate::{gui::EguiUi, synth::SharedBus};
     use eframe::{App, WebOptions, WebRunner};
-    use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
+    use wasm_bindgen::prelude::*;
 
     // Better error messages in the browser console on panic
     #[wasm_bindgen(start)]
@@ -48,9 +48,11 @@ mod web_entry {
             .start(
                 canvas,
                 options,
-                Box::new(|_cc| -> Result<Box<dyn App>, Box<dyn std::error::Error + Send + Sync>> {
-                    Ok(Box::new(EguiUi::new(SharedBus::default())))
-                }),
+                Box::new(
+                    |_cc| -> Result<Box<dyn App>, Box<dyn std::error::Error + Send + Sync>> {
+                        Ok(Box::new(EguiUi::new(SharedBus::default())))
+                    },
+                ),
             )
             .await
     }
