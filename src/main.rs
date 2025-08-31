@@ -9,6 +9,7 @@ use kbd_synth_min::{
     synth::{FilterType, Msg, SharedBus, Synth, Waveform},
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     // デバイスと出力設定
     let host = cpal::default_host();

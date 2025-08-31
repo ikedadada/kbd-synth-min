@@ -3,7 +3,14 @@ name = "kbd_synth_min"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 cpal = "0.16.0"
 crossbeam = "0.8.4"
 eframe = { version = "0.32.1", default-features = false, features = ["glow", "default_fonts", "wayland"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
