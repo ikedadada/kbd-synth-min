@@ -309,10 +309,7 @@ impl From<egui::Key> for Note {
             Colon => Note::F5,
             OpenBracket => Note::F5_5,
             CloseBracket => Note::G5,
-            _ => {
-                println!("Unhandled key: {:?}", key);
-                Note::None
-            }
+            _ => Note::None,
         }
     }
 }
