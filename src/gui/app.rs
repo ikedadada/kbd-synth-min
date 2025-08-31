@@ -268,6 +268,11 @@ impl App for EguiUi {
                 if repeat {
                     continue;
                 }
+                #[cfg(target_arch = "wasm32")]
+                if pressed {
+                    // Ensure AudioContext is resumed on first key press
+                    crate::web_entry::try_resume_audio();
+                }
                 let note = key.into();
                 if note == Note::None {
                     continue;
