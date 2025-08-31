@@ -294,7 +294,7 @@ impl From<egui::Key> for Note {
             Num2 => Note::D3,
             W => Note::D3_5,
             Num3 => Note::E3,
-            Num4 => Note::F4,
+            Num4 => Note::F3,
             R => Note::F3_5,
             Num5 => Note::G3,
             T => Note::G3_5,
