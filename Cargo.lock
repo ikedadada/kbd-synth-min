@@ -1104,6 +1104,7 @@ dependencies = [
  "crossbeam",
  "eframe",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

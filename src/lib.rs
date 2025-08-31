@@ -23,7 +23,7 @@ pub mod gui {
 #[cfg(target_arch = "wasm32")]
 mod web_entry {
     use crate::{gui::EguiUi, synth::SharedBus};
-    use eframe::WebOptions;
+    use eframe::{WebOptions, WebRunner};
     use wasm_bindgen::prelude::*;
 
     // Better error messages in the browser console on panic
@@ -32,11 +32,13 @@ mod web_entry {
         console_error_panic_hook::set_once();
 
         let options = WebOptions::default();
-        eframe::start_web(
-            "the_canvas_id",
-            options,
-            Box::new(|_cc| Box::new(EguiUi::new(SharedBus::default()))),
-        )
-        .await
+        let runner = WebRunner::new();
+        runner
+            .start(
+                "the_canvas_id",
+                options,
+                Box::new(|_cc| Box::new(EguiUi::new(SharedBus::default()))),
+            )
+            .await
     }
 }
