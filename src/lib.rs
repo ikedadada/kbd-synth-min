@@ -22,7 +22,7 @@ pub mod gui {
 // WASM entry point for web build
 #[cfg(target_arch = "wasm32")]
 mod web_entry {
-    use crate::synth::{FilterType, Msg, SharedBus, Synth, Waveform};
+    use crate::synth::{Msg, SharedBus, Synth, Waveform};
     use crate::gui::EguiUi;
     use eframe::{App, WebOptions, WebRunner};
     use wasm_bindgen::prelude::*;
@@ -40,8 +40,8 @@ mod web_entry {
         let sr = ctx.sample_rate();
 
         // Use ScriptProcessorNode for simplicity (works broadly; low-latency enough here)
-        let buffer_size: i32 = 1024; // power of two
-        let channels_out: i32 = 2;
+        let buffer_size: u32 = 1024; // power of two
+        let channels_out: u32 = 2;
         let proc = ctx
             .create_script_processor_with_buffer_size_and_number_of_input_channels_and_number_of_output_channels(
                 buffer_size,
@@ -65,8 +65,8 @@ mod web_entry {
             }
 
             let output = match e.output_buffer() {
-                Some(buf) => buf,
-                None => return,
+                Ok(buf) => buf,
+                Err(_) => return,
             };
             let frames = output.length() as usize;
             let num_ch = output.number_of_channels() as usize;
