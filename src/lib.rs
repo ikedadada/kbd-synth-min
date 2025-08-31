@@ -22,11 +22,11 @@ pub mod gui {
 // WASM entry point for web build
 #[cfg(target_arch = "wasm32")]
 mod web_entry {
-    use crate::synth::{Msg, SharedBus, Synth, Waveform};
     use crate::gui::EguiUi;
+    use crate::synth::{Msg, SharedBus, Synth, Waveform};
     use eframe::{App, WebOptions, WebRunner};
-    use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
+    use wasm_bindgen::prelude::*;
 
     use std::cell::RefCell;
     use wasm_bindgen::closure::Closure;
@@ -78,9 +78,7 @@ mod web_entry {
             }
 
             for ch in 0..num_ch {
-                if let Ok(arr) = output.get_channel_data(ch as u32) {
-                    arr.copy_from(&mono);
-                }
+                let _ = output.copy_to_channel(&mono, ch as i32);
             }
         }) as Box<dyn FnMut(_)>);
 
@@ -136,9 +134,11 @@ mod web_entry {
             .start(
                 canvas,
                 options,
-                Box::new(move |_cc| -> Result<Box<dyn App>, Box<dyn std::error::Error + Send + Sync>> {
-                    Ok(Box::new(EguiUi::new(bus_for_ui.clone())))
-                }),
+                Box::new(
+                    move |_cc| -> Result<Box<dyn App>, Box<dyn std::error::Error + Send + Sync>> {
+                        Ok(Box::new(EguiUi::new(bus_for_ui.clone())))
+                    },
+                ),
             )
             .await
     }
