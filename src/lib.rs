@@ -21,7 +21,7 @@ pub mod gui {
 
 // WASM entry point for web build
 #[cfg(target_arch = "wasm32")]
-mod web_entry {
+pub(crate) mod web_entry {
     use crate::gui::EguiUi;
     use crate::synth::{Msg, SharedBus, Synth, Waveform};
     use eframe::{App, WebOptions, WebRunner};
@@ -33,6 +33,7 @@ mod web_entry {
 
     thread_local! {
         static AUDIO_CONTEXT: RefCell<Option<web_sys::AudioContext>> = RefCell::new(None);
+        static SCRIPT_NODE: RefCell<Option<web_sys::ScriptProcessorNode>> = RefCell::new(None);
     }
 
     fn init_audio(bus: SharedBus) -> Result<(), JsValue> {
@@ -90,6 +91,7 @@ mod web_entry {
 
         // Store context so it stays alive
         AUDIO_CONTEXT.with(|c| c.borrow_mut().replace(ctx));
+        SCRIPT_NODE.with(|n| n.borrow_mut().replace(proc));
 
         // Try to resume on first user gesture (keydown / pointerdown)
         let resume = Closure::wrap(Box::new(move || {
@@ -106,6 +108,15 @@ mod web_entry {
         resume.forget(); // keep listeners alive
 
         Ok(())
+    }
+
+    // Allow resuming AudioContext from elsewhere in the crate (e.g. on first key press)
+    pub fn try_resume_audio() {
+        AUDIO_CONTEXT.with(|c| {
+            if let Some(ctx) = c.borrow().as_ref() {
+                let _ = ctx.resume();
+            }
+        });
     }
 
     // Better error messages in the browser console on panic
