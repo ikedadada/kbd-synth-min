@@ -1105,6 +1105,7 @@ dependencies = [
  "eframe",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

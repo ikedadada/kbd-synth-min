@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>kbd_synth_min (Web)</title>
     <!-- Build the crate to wasm via Trunk -->
-    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <link data-trunk rel="rust" data-wasm-opt="z" data-cargo-args="--lib" />
     <!-- Set correct base path when hosted on GitHub Pages -->
     <base data-trunk-public-url />
     <style>
@@ -17,4 +17,3 @@
     <canvas id="the_canvas_id"></canvas>
   </body>
   </html>
-
