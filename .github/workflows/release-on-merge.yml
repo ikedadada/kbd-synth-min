@@ -1,0 +1,96 @@
+name: Release on main merge
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BIN_NAME: kbd_synth_min
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            os: windows
+            arch: x86_64
+          - runner: macos-13
+            os: macos
+            arch: x86_64
+          - runner: macos-latest
+            os: macos
+            arch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release --locked
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $src = "target\release\${{ env.BIN_NAME }}.exe"
+          $dst = "${{ env.BIN_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.zip"
+          Compress-Archive -Path $src -DestinationPath $dst
+
+      - name: Package (macOS)
+        if: runner.os != 'Windows'
+        run: |
+          src="target/release/${BIN_NAME}"
+          dst="${BIN_NAME}-${{ matrix.os }}-${{ matrix.arch }}.zip"
+          chmod +x "$src"
+          zip -j "$dst" "$src"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BIN_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: "*.zip"
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute tag and name
+        id: meta
+        run: |
+          ts=$(date -u +'%Y%m%d-%H%M%S')
+          echo "TAG=v${ts}" >> $GITHUB_OUTPUT
+          echo "NAME=${BIN_NAME} ${ts}" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.TAG }}
+          name: ${{ steps.meta.outputs.NAME }}
+          draft: false
+          prerelease: false
+          files: dist/*.zip
+          
