@@ -22,12 +22,12 @@ impl Osc {
     }
 
     pub fn next_sample(&mut self) -> f32 {
-        let sample = self.waveform.sample(self.phase) * self.amp;
+        let sample = self.waveform.sample(self.phase, self.phase_inc);
         self.phase += self.phase_inc;
         if self.phase >= TAU {
             self.phase -= TAU;
         }
-        sample
+        sample * self.amp
     }
 
     pub fn set_waveform(&mut self, waveform: Waveform) {
@@ -35,31 +35,60 @@ impl Osc {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum Waveform {
     #[default]
     Sine,
-    Square,
+    Square {
+        pulse_width: f32,
+    },
     Sawtooth,
-    Triangle,
+    Triangle {
+        curve: f32,
+    },
 }
 
 impl Waveform {
-    pub fn sample(&self, phase: f32) -> f32 {
+    pub fn sample(&self, phase: f32, phase_inc: f32) -> f32 {
+        const BAND_WIDTH: f32 = 1.0;
+        let t = phase / TAU;
+        let dt = phase_inc / TAU;
         match self {
             Waveform::Sine => phase.sin(),
-            Waveform::Square => {
-                if phase.sin() >= 0.0 {
-                    1.0
-                } else {
-                    -1.0
-                }
+            Waveform::Square { pulse_width } => {
+                let p = pulse_width.clamp(0.05, 0.95);
+                let mut y = if t < p { 1.0 } else { -1.0 };
+                y += BAND_WIDTH * poly_blep(t, dt); // 上がり（t=0）
+                y -= BAND_WIDTH * poly_blep((t - p).rem_euclid(1.0), dt); // 下がり（t=p）
+                y
             }
-            Waveform::Sawtooth => phase / TAU * 2.0 - 1.0,
-            Waveform::Triangle => {
-                let t = phase / TAU;
-                1.0 - 4.0 * (t - 0.5).abs()
+            Waveform::Sawtooth => {
+                let mut y = 2.0 * t - 1.0;
+                y -= BAND_WIDTH * poly_blep(t, dt);
+                y
+            }
+            Waveform::Triangle { curve } => {
+                // BAND_WIDTHの適用は効果が薄かったため省略
+                let tri = 1.0 - 4.0 * (t - 0.5).abs();
+                tri.signum() * tri.abs().powf(1.0 + *curve * 2.0)
             }
         }
+    }
+}
+
+/* ---------------- ヘルパ ---------------- */
+#[inline]
+fn poly_blep(mut t: f32, dt: f32) -> f32 {
+    if dt <= 0.0 {
+        return 0.0;
+    }
+    if t < dt {
+        t /= dt;
+        t + t - t * t - 1.0 // 2t - t^2 - 1
+    } else if t > 1.0 - dt {
+        t = (t - 1.0) / dt;
+        t * t + t + t + 1.0 // t^2 + 2t + 1
+    } else {
+        0.0
     }
 }
