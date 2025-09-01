@@ -6,8 +6,9 @@ use cpal::{
 
 use eframe::{NativeOptions, egui};
 use kbd_synth_min::{
+    audio::core::render_block,
     gui::EguiUi,
-    synth::{FilterType, Msg, SharedBus, Synth, Waveform},
+    synth::{FilterType, SharedBus, Synth, Waveform},
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -80,25 +81,21 @@ where
 {
     let mut synth = Synth::new(params.sample_rate, params.waveform, params.filter);
     let bus = params.bus;
+    let channels = params.channels;
+    let mut scratch: Vec<f32> = Vec::new();
 
     params.device.build_output_stream(
         params.config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-            while let Some(msg) = bus.q.pop() {
-                match msg {
-                    Msg::NoteOn { note } => synth.note_on(note),
-                    Msg::NoteOff { note } => synth.note_off(note),
-                    Msg::SetMasterVolume(v) => synth.set_master_volume(v),
-                    Msg::SetAdsr { a, d, s, r } => synth.set_adsr(a, d, s, r),
-                    Msg::SetWaveform(wf) => synth.set_waveform(wf),
-                    Msg::SetFilter(ft) => synth.set_filter(ft),
-                }
+            let nframes = data.len() / channels;
+            if scratch.len() != nframes {
+                scratch.resize(nframes, 0.0);
             }
-            for frames in data.chunks_mut(params.channels) {
-                let sample = synth.next_sample();
-                let s: T = cpal::Sample::from_sample(sample);
-                for frame in frames {
-                    *frame = s;
+            render_block(&mut synth, &bus, &mut scratch);
+            for (i, frame) in data.chunks_mut(channels).enumerate() {
+                let s: T = cpal::Sample::from_sample(scratch[i]);
+                for ch in frame {
+                    *ch = s;
                 }
             }
         },

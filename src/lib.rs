@@ -14,6 +14,10 @@ pub mod synth {
     pub use shared_bus::SharedBus;
 }
 
+pub mod audio {
+    pub mod core;
+}
+
 pub mod gui {
     mod app;
     pub use app::EguiUi;
@@ -24,6 +28,7 @@ pub mod gui {
 pub(crate) mod web_entry {
     use crate::gui::EguiUi;
     use crate::synth::{Msg, SharedBus, Synth, Waveform};
+    use crate::audio::core::{render_block, QUANTUM};
     use eframe::{App, WebOptions, WebRunner};
     use wasm_bindgen::JsCast;
     use wasm_bindgen::prelude::*;
@@ -77,13 +82,16 @@ pub(crate) mod web_entry {
         let port_for_cb = port.clone();
         // Pre-fill one contiguous buffer of target blocks to reduce startup glitch
         {
-            let total = 128 * 8; // target blocks (keep in sync with worklet)
-            let arr = Float32Array::new_with_length(total as u32);
-            // Fill directly into typed array to avoid an extra copy
-            for i in 0..total {
-                let v = synth.next_sample().clamp(-1.0, 1.0);
-                arr.set_index(i as u32, v);
+            let total = QUANTUM * 8; // target blocks (keep in sync with worklet)
+            let mut mono = vec![0.0f32; total];
+            let mut idx = 0;
+            while idx < total {
+                let end = (idx + QUANTUM).min(total);
+                render_block(&mut synth, &bus_for_cb, &mut mono[idx..end]);
+                idx = end;
             }
+            let arr = Float32Array::new_with_length(total as u32);
+            arr.copy_from(&mono);
             let buf: ArrayBuffer = arr.buffer();
             let payload = Object::new();
             let _ = Reflect::set(&payload, &JsValue::from_str("mono"), &arr);
@@ -104,16 +112,17 @@ pub(crate) mod web_entry {
 
             let data = ev.data();
             let need_val = Reflect::get(&data, &JsValue::from_str("need")).ok();
-            let need_frames = need_val.and_then(|v| v.as_f64()).unwrap_or(128.0) as usize;
-            // Round up to quantum multiple
-            let quantum = 128usize;
-            let total = need_frames.div_ceil(quantum) * quantum;
-
-            let arr = Float32Array::new_with_length(total as u32);
-            for i in 0..total {
-                let v = synth.next_sample().clamp(-1.0, 1.0);
-                arr.set_index(i as u32, v);
+            let need_frames = need_val.and_then(|v| v.as_f64()).unwrap_or(QUANTUM as f64) as usize;
+            let total = need_frames.div_ceil(QUANTUM) * QUANTUM;
+            let mut mono = vec![0.0f32; total];
+            let mut idx = 0;
+            while idx < total {
+                let end = (idx + QUANTUM).min(total);
+                render_block(&mut synth, &bus_for_cb, &mut mono[idx..end]);
+                idx = end;
             }
+            let arr = Float32Array::new_with_length(total as u32);
+            arr.copy_from(&mono);
             let buf: ArrayBuffer = arr.buffer();
             let payload = Object::new();
             let _ = Reflect::set(&payload, &JsValue::from_str("mono"), &arr);
