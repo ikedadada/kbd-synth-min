@@ -33,27 +33,64 @@ pub(crate) mod web_entry {
 
     thread_local! {
         static AUDIO_CONTEXT: RefCell<Option<web_sys::AudioContext>> = const { RefCell::new(None) };
-        static SCRIPT_NODE: RefCell<Option<web_sys::ScriptProcessorNode>> = const { RefCell::new(None) };
+        static WORKLET_NODE: RefCell<Option<web_sys::AudioWorkletNode>> = const { RefCell::new(None) };
     }
 
-    fn init_audio(bus: SharedBus) -> Result<(), JsValue> {
-        let ctx = web_sys::AudioContext::new()?;
+    async fn init_audio(bus: SharedBus) -> Result<(), JsValue> {
+        use web_sys::js_sys::{Array, ArrayBuffer, Float32Array, Object, Reflect};
+
+        // Prefer interactive/low-latency context if available
+        let ctx = if true {
+            let opts = web_sys::AudioContextOptions::new();
+            // Set latencyHint: 'interactive'
+            opts.set_latency_hint(&JsValue::from_str("interactive"));
+            web_sys::AudioContext::new_with_context_options(&opts)?
+        } else {
+            web_sys::AudioContext::new()?
+        };
         let sr = ctx.sample_rate();
 
-        // Use ScriptProcessorNode for simplicity (works broadly; low-latency enough here)
-        let buffer_size: u32 = 1024; // power of two
-        let channels_out: u32 = 2;
-        let proc = ctx
-            .create_script_processor_with_buffer_size_and_number_of_input_channels_and_number_of_output_channels(
-                buffer_size,
-                0,
-                channels_out,
-            )?;
+        // AudioWorklet-only path
+        // Early return if AudioWorklet is unavailable
+        let aw = match ctx.audio_worklet() {
+            Ok(aw) => aw,
+            Err(_) => return Ok(()),
+        };
 
+        let p = aw.add_module("worklet/synth-processor.js")?;
+        wasm_bindgen_futures::JsFuture::from(p).await?;
+
+        let opts = web_sys::AudioWorkletNodeOptions::new();
+        opts.set_channel_count(2);
+        let counts = Array::new();
+        counts.push(&JsValue::from_f64(2.0));
+        opts.set_output_channel_count(&counts);
+
+        let node = web_sys::AudioWorkletNode::new_with_options(&ctx, "synth-processor", &opts)?;
+        let port = node.port()?;
+        port.start();
+
+        // Prepare synth and message handler
         let mut synth = Synth::new(sr, Waveform::Sine, None);
         let bus_for_cb = bus.clone();
-        let onaudio = Closure::wrap(Box::new(move |e: web_sys::AudioProcessingEvent| {
-            // Drain bus messages
+
+        let port_for_cb = port.clone();
+        // Pre-fill one contiguous buffer of target blocks to reduce startup glitch
+        {
+            let total = 128 * 8; // target blocks (keep in sync with worklet)
+            let arr = Float32Array::new_with_length(total as u32);
+            // Fill directly into typed array to avoid an extra copy
+            for i in 0..total {
+                let v = synth.next_sample().clamp(-1.0, 1.0);
+                arr.set_index(i as u32, v);
+            }
+            let buf: ArrayBuffer = arr.buffer();
+            let payload = Object::new();
+            let _ = Reflect::set(&payload, &JsValue::from_str("mono"), &arr);
+            let _ = port.post_message_with_transferable(&payload, &Array::of1(&buf));
+        }
+
+        let onmsg = Closure::wrap(Box::new(move |ev: web_sys::MessageEvent| {
             while let Some(msg) = bus_for_cb.q.pop() {
                 match msg {
                     Msg::NoteOn { note } => synth.note_on(note),
@@ -65,35 +102,31 @@ pub(crate) mod web_entry {
                 }
             }
 
-            let output = match e.output_buffer() {
-                Ok(buf) => buf,
-                Err(_) => return,
-            };
-            let frames = output.length() as usize;
-            let num_ch = output.number_of_channels() as usize;
+            let data = ev.data();
+            let need_val = Reflect::get(&data, &JsValue::from_str("need")).ok();
+            let need_frames = need_val.and_then(|v| v.as_f64()).unwrap_or(128.0) as usize;
+            // Round up to quantum multiple
+            let quantum = 128usize;
+            let total = need_frames.div_ceil(quantum) * quantum;
 
-            // Generate mono then copy to all output channels
-            let mut mono = vec![0.0f32; frames];
-            for s in mono.iter_mut() {
-                *s = synth.next_sample();
+            let arr = Float32Array::new_with_length(total as u32);
+            for i in 0..total {
+                let v = synth.next_sample().clamp(-1.0, 1.0);
+                arr.set_index(i as u32, v);
             }
-
-            for ch in 0..num_ch {
-                let _ = output.copy_to_channel(&mono, ch as i32);
-            }
+            let buf: ArrayBuffer = arr.buffer();
+            let payload = Object::new();
+            let _ = Reflect::set(&payload, &JsValue::from_str("mono"), &arr);
+            let _ = port_for_cb.post_message_with_transferable(&payload, &Array::of1(&buf));
         }) as Box<dyn FnMut(_)>);
+        port.set_onmessage(Some(onmsg.as_ref().unchecked_ref()));
+        onmsg.forget();
 
-        proc.set_onaudioprocess(Some(onaudio.as_ref().unchecked_ref()));
-        onaudio.forget(); // keep callback alive
-
-        // Connect to destination to start processing
-        proc.connect_with_audio_node(&ctx.destination())?;
-
-        // Store context so it stays alive
+        node.connect_with_audio_node(&ctx.destination())?;
         AUDIO_CONTEXT.with(|c| c.borrow_mut().replace(ctx));
-        SCRIPT_NODE.with(|n| n.borrow_mut().replace(proc));
+        WORKLET_NODE.with(|n| n.borrow_mut().replace(node));
 
-        // Try to resume on first user gesture (keydown / pointerdown)
+        // Resume on user gesture
         let resume = Closure::wrap(Box::new(move || {
             AUDIO_CONTEXT.with(|c| {
                 if let Some(ctx) = c.borrow().as_ref() {
@@ -105,7 +138,7 @@ pub(crate) mod web_entry {
         let et: &web_sys::EventTarget = window.as_ref();
         et.add_event_listener_with_callback("keydown", resume.as_ref().unchecked_ref())?;
         et.add_event_listener_with_callback("pointerdown", resume.as_ref().unchecked_ref())?;
-        resume.forget(); // keep listeners alive
+        resume.forget();
 
         Ok(())
     }
@@ -136,7 +169,7 @@ pub(crate) mod web_entry {
 
         // Shared bus between UI and audio
         let bus = SharedBus::default();
-        init_audio(bus.clone())?;
+        init_audio(bus.clone()).await?;
 
         let options = WebOptions::default();
         let runner = WebRunner::new();
