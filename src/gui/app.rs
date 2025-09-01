@@ -268,6 +268,11 @@ impl App for EguiUi {
                 if repeat {
                     continue;
                 }
+                #[cfg(target_arch = "wasm32")]
+                if pressed {
+                    // Ensure AudioContext is resumed on first key press
+                    crate::web_entry::try_resume_audio();
+                }
                 let note = key.into();
                 if note == Note::None {
                     continue;
@@ -289,45 +294,25 @@ impl From<egui::Key> for Note {
     fn from(key: egui::Key) -> Note {
         use egui::Key::*;
         match key {
-            Num1 => Note::C3,
-            Q => Note::C3_5,
-            Num2 => Note::D3,
-            W => Note::D3_5,
-            Num3 => Note::E3,
-            Num4 => Note::F3,
-            R => Note::F3_5,
-            Num5 => Note::G3,
-            T => Note::G3_5,
-            Num6 => Note::A3,
-            Y => Note::A3_5,
-            Num7 => Note::B3,
-            Num8 => Note::C4,
-            I => Note::C4_5,
-            Num9 => Note::D4,
-            O => Note::D4_5,
-            Num0 => Note::E4,
-            Minus => Note::F4,
-            OpenBracket => Note::F4_5,
-            Equals => Note::G4,
             A => Note::C4,
-            Z => Note::C4_5,
+            W => Note::C4_5,
             S => Note::D4,
-            X => Note::D4_5,
+            E => Note::D4_5,
             D => Note::E4,
             F => Note::F4,
-            V => Note::F4_5,
+            T => Note::F4_5,
             G => Note::G4,
-            B => Note::G4_5,
+            Y => Note::G4_5,
             H => Note::A4,
-            N => Note::A4_5,
+            U => Note::A4_5,
             J => Note::B4,
             K => Note::C5,
-            Comma => Note::C5_5,
+            O => Note::C5_5,
             L => Note::D5,
-            Period => Note::D5_5,
+            P => Note::D5_5,
             Semicolon => Note::E5,
             Colon => Note::F5,
-            Slash => Note::F5_5,
+            OpenBracket => Note::F5_5,
             CloseBracket => Note::G5,
             _ => Note::None,
         }

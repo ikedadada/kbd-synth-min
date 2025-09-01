@@ -3,7 +3,47 @@ name = "kbd_synth_min"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Enable the native (desktop) binary only when this feature is set.
+native = []
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "kbd_synth_min"
+path = "src/main.rs"
+# Skip building the binary unless the `native` feature is enabled
+required-features = ["native"]
+
 [dependencies]
-cpal = "0.16.0"
 crossbeam = "0.8.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    # WebAudio
+    "AudioContext",
+    "AudioContextOptions",
+    "AudioContextLatencyCategory",
+    "AudioNode",
+    "AudioDestinationNode",
+    "AudioWorklet",
+    "AudioWorkletNode",
+    "AudioWorkletNodeOptions",
+    "MessagePort",
+    "MessageEvent",
+    # Events
+    "EventTarget",
+    "KeyboardEvent",
+] }
+eframe = { version = "0.32.1", default-features = false, features = ["glow", "default_fonts"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cpal = "0.16.0"
 eframe = { version = "0.32.1", default-features = false, features = ["glow", "default_fonts", "wayland"] }
