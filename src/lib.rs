@@ -32,8 +32,8 @@ pub(crate) mod web_entry {
     use wasm_bindgen::closure::Closure;
 
     thread_local! {
-        static AUDIO_CONTEXT: RefCell<Option<web_sys::AudioContext>> = RefCell::new(None);
-        static SCRIPT_NODE: RefCell<Option<web_sys::ScriptProcessorNode>> = RefCell::new(None);
+        static AUDIO_CONTEXT: RefCell<Option<web_sys::AudioContext>> = const { RefCell::new(None) };
+        static SCRIPT_NODE: RefCell<Option<web_sys::ScriptProcessorNode>> = const { RefCell::new(None) };
     }
 
     fn init_audio(bus: SharedBus) -> Result<(), JsValue> {
